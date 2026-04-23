@@ -27,15 +27,19 @@ local themeIdx=1
 local P=THEMES[themeIdx]
 
 local function corner(o,r) local c=Instance.new("UICorner",o) c.CornerRadius=UDim.new(0,r or 6) end
-local function mkstroke(o,col,th,tr) local s=Instance.new("UIStroke",o) s.Color=col s.Thickness=th or 1 s.Transparency=tr or 0.6 end
+-- FIX: ApplyStrokeMode.Border keeps stroke fully inside frame, no bleed on sides
+local function mkstroke(o,col,th,tr)
+    local s=Instance.new("UIStroke",o)
+    s.Color=col s.Thickness=th or 1 s.Transparency=tr or 0.6
+    s.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+end
 local function vp() return cam.ViewportSize end
 local isTouch=UIS.TouchEnabled
 
-if root:FindFirstChild("_av6") then return end
-local g=Instance.new("ScreenGui") g.Name="_av6" g.ResetOnSpawn=false g.Parent=root
+if root:FindFirstChild("_av8") then return end
+local g=Instance.new("ScreenGui") g.Name="_av8" g.ResetOnSpawn=false g.Parent=root
 for _,n in ipairs({"_avMain","_avIcon"}) do local o=root:FindFirstChild(n) if o then o:Destroy() end end
 
--- notifications
 local notifs={}
 local function Notify(title,body,dur)
     coroutine.wrap(function()
@@ -64,8 +68,8 @@ end
 
 local PW=math.floor(vp().X*0.27)
 local PH=math.floor(vp().Y*0.58)
-local IW=math.floor(vp().X*0.04)
-local IH=math.floor(vp().Y*0.072)
+local IW=math.floor(vp().X*0.058)
+local IH=math.floor(vp().Y*0.104)
 local PAD=8
 local HH=math.floor(PH*0.09)
 local SH=math.floor(PH*0.065)
@@ -86,36 +90,47 @@ local panel=Instance.new("Frame",mainSG)
 panel.Name="Panel" panel.Size=UDim2.new(0,PW,0,PH)
 panel.Position=UDim2.new(0.5,-PW/2,0.5,-PH/2)
 panel.BackgroundColor3=P.panel panel.BorderSizePixel=0 panel.ClipsDescendants=true
-corner(panel,8) local panelStroke=mkstroke(panel,P.border,1,0.5)
+corner(panel,8) mkstroke(panel,P.border,1,0.5)
 
+-- header: outer frame matches panel color so corners are clean
 local header=Instance.new("Frame",panel)
-header.Size=UDim2.new(1,0,0,HH) header.BackgroundColor3=P.bg header.BorderSizePixel=0
+header.Size=UDim2.new(1,0,0,HH)
+header.BackgroundColor3=P.panel header.BorderSizePixel=0
+
+local headerBg=Instance.new("Frame",header)
+headerBg.Size=UDim2.new(1,0,1,0) headerBg.Position=UDim2.new(0,0,0,0)
+headerBg.BackgroundColor3=P.bg headerBg.BorderSizePixel=0
+
+local headerTopCover=Instance.new("Frame",header)
+headerTopCover.Size=UDim2.new(1,0,0,8)
+headerTopCover.BackgroundColor3=P.panel headerTopCover.BorderSizePixel=0 headerTopCover.ZIndex=2
 
 local rule=Instance.new("Frame",header)
 rule.Size=UDim2.new(1,0,0,1) rule.Position=UDim2.new(0,0,1,-1)
-rule.BackgroundColor3=P.border rule.BorderSizePixel=0
+rule.BackgroundColor3=P.border rule.BorderSizePixel=0 rule.ZIndex=3
 
 local titleLbl=Instance.new("TextLabel",header)
 titleLbl.Size=UDim2.new(0.5,0,1,0) titleLbl.Position=UDim2.new(0,10,0,0)
 titleLbl.BackgroundTransparency=1 titleLbl.Font=Enum.Font.Antique
 titleLbl.Text="Animations" titleLbl.TextColor3=P.text
-titleLbl.TextScaled=true titleLbl.TextXAlignment=Enum.TextXAlignment.Left
+titleLbl.TextScaled=true titleLbl.TextXAlignment=Enum.TextXAlignment.Left titleLbl.ZIndex=3
 
 local themeBtn=Instance.new("TextButton",header)
 themeBtn.Size=UDim2.new(0,math.floor(PW*0.22),0,math.floor(HH*0.55))
 themeBtn.Position=UDim2.new(1,-math.floor(PW*0.31),0.5,-math.floor(HH*0.275))
 themeBtn.BackgroundColor3=P.raised themeBtn.BorderSizePixel=0
 themeBtn.Font=Enum.Font.Gotham themeBtn.Text=P.name
-themeBtn.TextColor3=P.textDim themeBtn.TextScaled=true corner(themeBtn,4)
+themeBtn.TextColor3=P.textDim themeBtn.TextScaled=true themeBtn.ZIndex=3
+corner(themeBtn,4)
 
 local minBtn=Instance.new("TextButton",header)
 minBtn.Size=UDim2.new(0,24,0,math.floor(HH*0.55))
 minBtn.Position=UDim2.new(1,-30,0.5,-math.floor(HH*0.275))
 minBtn.BackgroundColor3=P.raised minBtn.BorderSizePixel=0
 minBtn.Font=Enum.Font.GothamBold minBtn.Text="-"
-minBtn.TextColor3=P.textDim minBtn.TextScaled=true corner(minBtn,4)
+minBtn.TextColor3=P.textDim minBtn.TextScaled=true minBtn.ZIndex=3
+corner(minBtn,4)
 
--- drag
 local dragging,dStart,dOrigin=false,nil,nil
 local function syncShadow() shadow.Position=UDim2.new(0,panel.Position.X.Offset+4,0,panel.Position.Y.Offset+5) end
 header.InputBegan:Connect(function(inp)
@@ -138,7 +153,7 @@ end)
 local searchBg=Instance.new("Frame",panel)
 searchBg.Size=UDim2.new(1,-PAD*2,0,SH) searchBg.Position=UDim2.new(0,PAD,0,HH+PAD)
 searchBg.BackgroundColor3=P.bg searchBg.BorderSizePixel=0
-corner(searchBg,5) local searchStroke=mkstroke(searchBg,P.border,1,0.5)
+corner(searchBg,5) mkstroke(searchBg,P.border,1,0.5)
 
 local searchBox=Instance.new("TextBox",searchBg)
 searchBox.Size=UDim2.new(1,-8,1,0) searchBox.Position=UDim2.new(0,4,0,0)
@@ -162,12 +177,11 @@ list.ScrollBarImageTransparency=0.3 list.ScrollingDirection=Enum.ScrollingDirect
 list.CanvasSize=UDim2.new(0,0,0,0) list.ElasticBehavior=Enum.ElasticBehavior.WhenScrollable
 corner(list,5)
 
--- icon
 local iconSG=Instance.new("ScreenGui") iconSG.Name="_avIcon" iconSG.ResetOnSpawn=false iconSG.Parent=root
 local icon=Instance.new("ImageButton",iconSG)
 icon.Image="rbxassetid://129041843013567" icon.ScaleType=Enum.ScaleType.Crop
 icon.Size=UDim2.new(0,IW,0,IH) icon.Position=UDim2.new(1,-IW-10,0,10)
-icon.BackgroundColor3=P.raised icon.BorderSizePixel=0 icon.Visible=false corner(icon,8)
+icon.BackgroundColor3=P.raised icon.BorderSizePixel=0 icon.Visible=false corner(icon,10)
 
 local iHold,iDrag,iIS,iPS=false,false,Vector2.new(),Vector2.new()
 icon.InputBegan:Connect(function(inp)
@@ -201,9 +215,18 @@ local function restore()
     TS:Create(shadow,TweenInfo.new(0.3),{BackgroundTransparency=0.65}):Play()
 end
 minBtn.MouseButton1Click:Connect(minimize)
+
+local tapCount=0
+local tapThread=nil
 icon.InputEnded:Connect(function(inp)
     if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-        if not iDrag and isMin then restore() end
+        if iDrag then iHold=false iDrag=false return end
+        tapCount=tapCount+1
+        if tapThread then task.cancel(tapThread) end
+        tapThread=task.delay(0.4,function()
+            if tapCount>=2 and isMin then restore() end
+            tapCount=0
+        end)
         iHold=false iDrag=false
     end
 end)
@@ -212,12 +235,15 @@ UIS.InputBegan:Connect(function(inp,gp)
     if inp.KeyCode==Enum.KeyCode.RightShift then if isMin then restore() else minimize() end end
 end)
 
--- pool forward ref
 local pool={}
 
 local function applyTheme()
     P=THEMES[themeIdx]
-    panel.BackgroundColor3=P.panel header.BackgroundColor3=P.bg rule.BackgroundColor3=P.border
+    panel.BackgroundColor3=P.panel
+    header.BackgroundColor3=P.panel
+    headerBg.BackgroundColor3=P.bg
+    headerTopCover.BackgroundColor3=P.panel
+    rule.BackgroundColor3=P.border
     titleLbl.TextColor3=P.text
     themeBtn.BackgroundColor3=P.raised themeBtn.TextColor3=P.textDim themeBtn.Text=P.name
     minBtn.BackgroundColor3=P.raised minBtn.TextColor3=P.textDim
@@ -227,7 +253,8 @@ local function applyTheme()
     fullBtn.BackgroundColor3=P.raised fullBtn.TextColor3=P.textDim
     list.BackgroundColor3=P.bg list.ScrollBarImageColor3=P.accent
     icon.BackgroundColor3=P.raised
-    local ps=panel:FindFirstChildOfClass("UIStroke") if ps then ps.Color=P.border end
+    local ps=panel:FindFirstChildOfClass("UIStroke")
+    if ps then ps.Color=P.border ps.ApplyStrokeMode=Enum.ApplyStrokeMode.Border end
     for _,r in ipairs(pool) do
         r.btn.BackgroundColor3=P.raised
         r.nl.TextColor3=P.textDim r.tl.TextColor3=P.textDim r.bar.BackgroundColor3=P.accent
@@ -237,7 +264,6 @@ themeBtn.MouseButton1Click:Connect(function()
     themeIdx=themeIdx%#THEMES+1 applyTheme()
 end)
 
--- database
 local DB
 local function loadDB()
     if DB then return end
@@ -365,7 +391,10 @@ local function loadDB()
     }
 end
 
-local ORDER={"Idle","Walk","Run","Jump","Fall","Swim","SwimIdle","Climb"}
+local ORDER={"Idle","Walk","Run","Jump","Fall","Climb","Swim","SwimIdle"}
+local TYPE_IDX={}
+for i,t in ipairs(ORDER) do TYPE_IDX[t]=i end
+
 local saved={}
 pcall(function()
     if isfile and isfile("av_saves.json") then
@@ -422,44 +451,43 @@ if Players.LocalPlayer.Character then
     end)
 end
 
--- ── virtual list ─────────────────────────────────────────────────────────────
--- LAG FIXES:
--- 1. Pool stores cached child refs so no FindFirstChild per frame
--- 2. Hover connections stored per-row and only assigned ONCE at creation, not per updateList
--- 3. Scroll throttle: updateList only fires when scroll crosses a row boundary
--- 4. No TweenService calls at all in hot path (scroll/update)
--- 5. Filtered array reused, only rebuilt when search changes
-
 local POOL=14
 local RH=33
 local RS=RH+3
-local pConns={}     -- click connections only
-local hConns={}     -- hover connections, assigned once, never reconnected
+local pConns={}
 local allData,fullData,filtered={},{},{}
 local activeKey=nil
 local isFull=false
-local lastScrollRow=-1  -- throttle: track last row index drawn
+local lastScrollRow=-1
+local filteredDirty=true
 
--- each pool entry stores refs to avoid FindFirstChild
--- pool[i] = {btn, nl, tl, bar}
 local function makeRow(i)
     local btn=Instance.new("TextButton",list)
     btn.Name="R"..i btn.Size=UDim2.new(1,0,0,RH)
     btn.Position=UDim2.new(0,0,0,(i-1)*RS)
     btn.BackgroundColor3=P.raised btn.BorderSizePixel=0
     btn.Font=Enum.Font.Gotham btn.Text=""
-    btn.TextScaled=true btn.ClipsDescendants=false
+    btn.TextScaled=true
+    -- FIX: ClipsDescendants=true prevents NL/TL labels bleeding outside button
+    btn.ClipsDescendants=true
     btn.Visible=false btn.ZIndex=3
     corner(btn,5)
 
+    -- NL: name, left side, stops before tag
     local nl=Instance.new("TextLabel",btn)
-    nl.Name="NL" nl.Size=UDim2.new(1,-TAGW,1,0) nl.Position=UDim2.new(0,8,0,0)
+    nl.Name="NL"
+    nl.Size=UDim2.new(1,-TAGW-4,1,0)
+    nl.Position=UDim2.new(0,8,0,0)
     nl.BackgroundTransparency=1 nl.Font=Enum.Font.Gotham nl.Text=""
     nl.TextColor3=P.textDim nl.TextScaled=true nl.TextXAlignment=Enum.TextXAlignment.Left
     nl.TextTruncate=Enum.TextTruncate.AtEnd nl.ZIndex=4
 
+    -- TL: type tag, right side, fully inside button
     local tl=Instance.new("TextLabel",btn)
-    tl.Name="TL" tl.Size=UDim2.new(0,TAGW-8,1,0) tl.Position=UDim2.new(1,-TAGW,0,0)
+    tl.Name="TL"
+    -- position from right edge inward, with 4px breathing room from edge
+    tl.Size=UDim2.new(0,TAGW-8,1,0)
+    tl.Position=UDim2.new(1,-TAGW+4,0,0)
     tl.BackgroundTransparency=1 tl.Font=Enum.Font.Gotham tl.Text=""
     tl.TextColor3=P.textDim tl.TextScaled=true tl.TextXAlignment=Enum.TextXAlignment.Right
     tl.ZIndex=4
@@ -469,20 +497,15 @@ local function makeRow(i)
     bar.BackgroundColor3=P.accent bar.BorderSizePixel=0 bar.Visible=false bar.ZIndex=4
     corner(bar,2)
 
-    local ref={btn=btn,nl=nl,tl=tl,bar=bar}
+    local ref={btn=btn,nl=nl,tl=tl,bar=bar,_key=nil}
     pool[i]=ref
 
-    -- hover assigned ONCE here, reads activeKey at call time (closure over ref)
     if not isTouch then
-        hConns[i]=btn.MouseEnter:Connect(function()
-            if activeKey~=ref._key then
-                btn.BackgroundColor3=P.hover nl.TextColor3=P.text
-            end
+        btn.MouseEnter:Connect(function()
+            if activeKey~=ref._key then btn.BackgroundColor3=P.hover nl.TextColor3=P.text end
         end)
         btn.MouseLeave:Connect(function()
-            if activeKey~=ref._key then
-                btn.BackgroundColor3=P.raised nl.TextColor3=P.textDim
-            end
+            if activeKey~=ref._key then btn.BackgroundColor3=P.raised nl.TextColor3=P.textDim end
         end)
     end
     return ref
@@ -493,11 +516,15 @@ local function populateData()
     allData={}
     for _,t in ipairs(ORDER) do
         local anims=DB[t]
-        if anims then for name,ids in pairs(anims) do
-            table.insert(allData,{name=name,type=t,ids=ids,key=name..t})
-        end end
+        if anims then
+            local names={}
+            for name in pairs(anims) do table.insert(names,name) end
+            table.sort(names)
+            for _,name in ipairs(names) do
+                table.insert(allData,{name=name,type=t,ids=anims[name],key=name..t,typeIdx=TYPE_IDX[t]})
+            end
+        end
     end
-    table.sort(allData,function(a,b) return a.name<b.name end)
 
     local cnt,slots={},{}
     for _,t in ipairs(ORDER) do
@@ -512,31 +539,37 @@ local function populateData()
     for k,n in pairs(cnt) do
         if n>=4 and not seen[k] then seen[k]=true
             local s=slots[k]
-            table.insert(fullData,{name=s.dn,isFullSet=true,slots=s,type="SET",key=s.dn.."SET"})
+            table.insert(fullData,{name=s.dn,isFullSet=true,slots=s,type="SET",key=s.dn.."SET",typeIdx=0})
         end
     end
     table.sort(fullData,function(a,b) return a.name<b.name end)
 end
 
-local filteredDirty=true
-local lastQ=""
-
 local function rebuildFiltered()
     local src=isFull and fullData or allData
     local q=searchBox.Text:lower()
-    lastQ=q
     if q~="" then
         filtered={}
-        for _,d in ipairs(src) do if d.name:lower():find(q,1,true) then table.insert(filtered,d) end end
-    else filtered=src end
+        for _,d in ipairs(src) do
+            if d.name:lower():find(q,1,true) or d.type:lower():find(q,1,true) then
+                table.insert(filtered,d)
+            end
+        end
+        table.sort(filtered,function(a,b)
+            if a.typeIdx~=b.typeIdx then return a.typeIdx<b.typeIdx end
+            return a.name<b.name
+        end)
+    else
+        filtered=src
+    end
     filteredDirty=false
-    lastScrollRow=-1  -- force redraw
+    lastScrollRow=-1
 end
 
 local function renderRows()
     local sy=list.CanvasPosition.Y
     local s1=math.floor(sy/RS)+1
-    if s1==lastScrollRow and not filteredDirty then return end  -- nothing changed
+    if s1==lastScrollRow and not filteredDirty then return end
     lastScrollRow=s1
     local s2=math.min(s1+POOL-1,#filtered)
 
@@ -548,7 +581,7 @@ local function renderRows()
         if di<=s2 then
             local d=filtered[di]
             local act=activeKey==d.key
-            ref._key=d.key  -- store for hover closure
+            ref._key=d.key
 
             ref.btn.Position=UDim2.new(0,0,0,(di-1)*RS)
             ref.btn.Visible=true
@@ -578,10 +611,7 @@ local function renderRows()
     list.CanvasSize=UDim2.new(0,0,0,#filtered*RS)
 end
 
-local function updateList()
-    rebuildFiltered()
-    renderRows()
-end
+local function updateList() rebuildFiltered() renderRows() end
 
 local searchThread
 searchBox:GetPropertyChangedSignal("Text"):Connect(function()
@@ -589,8 +619,6 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
     filteredDirty=true
     searchThread=task.delay(0.3,updateList)
 end)
-
--- scroll: only re-render, don't rebuild filter
 list:GetPropertyChangedSignal("CanvasPosition"):Connect(renderRows)
 
 local function refreshToggle()
