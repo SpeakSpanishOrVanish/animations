@@ -16,30 +16,27 @@ cloneref=cloneref or function(o) return o end
 local root=cloneref(game.CoreGui)
 
 local THEMES={
-    {name="Warm",bg=Color3.fromRGB(22,21,20),panel=Color3.fromRGB(30,28,26),raised=Color3.fromRGB(40,37,34),
-     hover=Color3.fromRGB(52,48,44),active=Color3.fromRGB(62,44,40),border=Color3.fromRGB(60,55,50),
-     accent=Color3.fromRGB(188,120,90),text=Color3.fromRGB(220,210,195),textDim=Color3.fromRGB(110,100,90)},
-    {name="Crimson",bg=Color3.fromRGB(14,10,10),panel=Color3.fromRGB(22,14,14),raised=Color3.fromRGB(34,20,20),
-     hover=Color3.fromRGB(48,26,26),active=Color3.fromRGB(58,22,22),border=Color3.fromRGB(65,32,32),
-     accent=Color3.fromRGB(180,60,60),text=Color3.fromRGB(220,200,200),textDim=Color3.fromRGB(110,75,75)},
+    {name="Warm",
+     bg=Color3.fromRGB(20,19,18),panel=Color3.fromRGB(28,26,24),raised=Color3.fromRGB(38,35,32),
+     hover=Color3.fromRGB(50,46,42),active=Color3.fromRGB(58,42,38),border=Color3.fromRGB(55,50,45),
+     accent=Color3.fromRGB(188,120,90),text=Color3.fromRGB(218,208,192),textDim=Color3.fromRGB(108,98,88)},
+    {name="Crimson",
+     bg=Color3.fromRGB(12,9,9),panel=Color3.fromRGB(20,13,13),raised=Color3.fromRGB(32,18,18),
+     hover=Color3.fromRGB(45,24,24),active=Color3.fromRGB(55,20,20),border=Color3.fromRGB(60,28,28),
+     accent=Color3.fromRGB(180,55,55),text=Color3.fromRGB(218,198,198),textDim=Color3.fromRGB(108,72,72)},
 }
 local themeIdx=1
 local P=THEMES[themeIdx]
 
 local function corner(o,r) local c=Instance.new("UICorner",o) c.CornerRadius=UDim.new(0,r or 6) end
--- FIX: ApplyStrokeMode.Border keeps stroke fully inside frame, no bleed on sides
-local function mkstroke(o,col,th,tr)
-    local s=Instance.new("UIStroke",o)
-    s.Color=col s.Thickness=th or 1 s.Transparency=tr or 0.6
-    s.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
-end
 local function vp() return cam.ViewportSize end
 local isTouch=UIS.TouchEnabled
 
-if root:FindFirstChild("_av8") then return end
-local g=Instance.new("ScreenGui") g.Name="_av8" g.ResetOnSpawn=false g.Parent=root
+if root:FindFirstChild("_av9") then return end
+local grd=Instance.new("ScreenGui") grd.Name="_av9" grd.ResetOnSpawn=false grd.Parent=root
 for _,n in ipairs({"_avMain","_avIcon"}) do local o=root:FindFirstChild(n) if o then o:Destroy() end end
 
+-- ── notifications ─────────────────────────────────────────────────────────────
 local notifs={}
 local function Notify(title,body,dur)
     coroutine.wrap(function()
@@ -47,7 +44,12 @@ local function Notify(title,body,dur)
         local sg=Instance.new("ScreenGui") sg.Parent=root
         local f=Instance.new("Frame",sg)
         f.Size=UDim2.new(0,W,0,H) f.BackgroundColor3=P.panel f.BorderSizePixel=0
-        corner(f,6) mkstroke(f,P.border,1,0.4)
+        corner(f,6)
+        -- border via child frame overlay (no UIStroke)
+        local fb=Instance.new("Frame",f) fb.Size=UDim2.new(1,0,1,0) fb.BackgroundTransparency=1
+        fb.BorderSizePixel=0 corner(fb,6)
+        local fbs=Instance.new("UIStroke",fb) fbs.Color=P.border fbs.Thickness=1 fbs.Transparency=0.4
+        fbs.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
         local bar=Instance.new("Frame",f) bar.Size=UDim2.new(0,3,1,0) bar.BackgroundColor3=P.accent bar.BorderSizePixel=0 corner(bar,3)
         local tl=Instance.new("TextLabel",f) tl.Size=UDim2.new(1,-12,0.45,0) tl.Position=UDim2.new(0,10,0,5)
         tl.BackgroundTransparency=1 tl.Font=Enum.Font.GothamBold tl.Text=title tl.TextColor3=P.accent tl.TextScaled=true tl.TextXAlignment=Enum.TextXAlignment.Left
@@ -66,61 +68,94 @@ local function Notify(title,body,dur)
     end)()
 end
 
+-- ── layout constants ──────────────────────────────────────────────────────────
 local PW=math.floor(vp().X*0.27)
 local PH=math.floor(vp().Y*0.58)
 local IW=math.floor(vp().X*0.058)
 local IH=math.floor(vp().Y*0.104)
 local PAD=8
+local R=8           -- panel corner radius
 local HH=math.floor(PH*0.09)
 local SH=math.floor(PH*0.065)
 local TH=math.floor(PH*0.058)
 local TAGW=math.floor(PW*0.28)
 local toggleY=HH+PAD+SH+5
 local listY=toggleY+TH+6
-local listH=PH-listY-PAD
+-- list stops PAD+R from bottom so corner clips don't show
+local listH=PH-listY-PAD-R
 
+-- ── main ScreenGui ────────────────────────────────────────────────────────────
 local mainSG=Instance.new("ScreenGui") mainSG.Name="_avMain" mainSG.ResetOnSpawn=false mainSG.Parent=root
 
+-- shadow (behind panel, no stroke needed)
 local shadow=Instance.new("Frame",mainSG)
 shadow.Size=UDim2.new(0,PW,0,PH) shadow.BackgroundColor3=Color3.fromRGB(0,0,0)
-shadow.BackgroundTransparency=0.65 shadow.BorderSizePixel=0
-shadow.Position=UDim2.new(0.5,-PW/2+4,0.5,-PH/2+5) corner(shadow,10)
+shadow.BackgroundTransparency=0.7 shadow.BorderSizePixel=0
+shadow.Position=UDim2.new(0.5,-PW/2+5,0.5,-PH/2+6)
+corner(shadow,R+2)
 
-local panel=Instance.new("Frame",mainSG)
-panel.Name="Panel" panel.Size=UDim2.new(0,PW,0,PH)
-panel.Position=UDim2.new(0.5,-PW/2,0.5,-PH/2)
-panel.BackgroundColor3=P.panel panel.BorderSizePixel=0 panel.ClipsDescendants=true
-corner(panel,8) mkstroke(panel,P.border,1,0.5)
+-- ── PANEL ARCHITECTURE ────────────────────────────────────────────────────────
+-- The key insight: UIStroke on a ClipsDescendants frame renders outside the clip
+-- boundary, causing side/bottom bleed. Solution:
+--   1. panelBg  = the actual clipped content container (no stroke)
+--   2. panelBorder = a transparent overlay frame OUTSIDE ClipsDescendants
+--                    parented to mainSG, same size/position, carries the UIStroke
+--                    This overlay is never clipped so the stroke is pixel-perfect.
 
--- header: outer frame matches panel color so corners are clean
+local panelBg=Instance.new("Frame",mainSG)
+panelBg.Name="PanelBg"
+panelBg.Size=UDim2.new(0,PW,0,PH)
+panelBg.Position=UDim2.new(0.5,-PW/2,0.5,-PH/2)
+panelBg.BackgroundColor3=P.panel panelBg.BorderSizePixel=0
+panelBg.ClipsDescendants=true   -- clips children only, no stroke here
+corner(panelBg,R)
+
+-- border overlay: transparent background, sits on top of panelBg, same pos/size
+local panelBorder=Instance.new("Frame",mainSG)
+panelBorder.Name="PanelBorder"
+panelBorder.Size=UDim2.new(0,PW,0,PH)
+panelBorder.Position=UDim2.new(0.5,-PW/2,0.5,-PH/2)
+panelBorder.BackgroundTransparency=1 panelBorder.BorderSizePixel=0
+panelBorder.ZIndex=10  -- always on top
+corner(panelBorder,R)
+local panelStroke=Instance.new("UIStroke",panelBorder)
+panelStroke.Color=P.border panelStroke.Thickness=1.5 panelStroke.Transparency=0.35
+panelStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
+
+-- from here all content parents to panelBg (the clipped container)
+local panel=panelBg  -- alias for brevity in the rest of the code
+
+-- ── header ────────────────────────────────────────────────────────────────────
+-- header bg matches panel so top rounded corners are seamless
 local header=Instance.new("Frame",panel)
 header.Size=UDim2.new(1,0,0,HH)
 header.BackgroundColor3=P.panel header.BorderSizePixel=0
 
-local headerBg=Instance.new("Frame",header)
-headerBg.Size=UDim2.new(1,0,1,0) headerBg.Position=UDim2.new(0,0,0,0)
-headerBg.BackgroundColor3=P.bg headerBg.BorderSizePixel=0
+-- darker inset strip (the actual dark header color)
+local hBg=Instance.new("Frame",header)
+hBg.Size=UDim2.new(1,0,1,0) hBg.BackgroundColor3=P.bg hBg.BorderSizePixel=0
 
-local headerTopCover=Instance.new("Frame",header)
-headerTopCover.Size=UDim2.new(1,0,0,8)
-headerTopCover.BackgroundColor3=P.panel headerTopCover.BorderSizePixel=0 headerTopCover.ZIndex=2
+-- cover top R pixels with panel color to hide corner bleed from hBg
+local hCover=Instance.new("Frame",header)
+hCover.Size=UDim2.new(1,0,0,R) hCover.BackgroundColor3=P.panel hCover.BorderSizePixel=0 hCover.ZIndex=2
 
-local rule=Instance.new("Frame",header)
-rule.Size=UDim2.new(1,0,0,1) rule.Position=UDim2.new(0,0,1,-1)
-rule.BackgroundColor3=P.border rule.BorderSizePixel=0 rule.ZIndex=3
+-- thin separator line at bottom of header
+local hRule=Instance.new("Frame",header)
+hRule.Size=UDim2.new(1,0,0,1) hRule.Position=UDim2.new(0,0,1,-1)
+hRule.BackgroundColor3=P.border hRule.BorderSizePixel=0 hRule.ZIndex=3
 
 local titleLbl=Instance.new("TextLabel",header)
 titleLbl.Size=UDim2.new(0.5,0,1,0) titleLbl.Position=UDim2.new(0,10,0,0)
 titleLbl.BackgroundTransparency=1 titleLbl.Font=Enum.Font.Antique
 titleLbl.Text="Animations" titleLbl.TextColor3=P.text
-titleLbl.TextScaled=true titleLbl.TextXAlignment=Enum.TextXAlignment.Left titleLbl.ZIndex=3
+titleLbl.TextScaled=true titleLbl.TextXAlignment=Enum.TextXAlignment.Left titleLbl.ZIndex=4
 
 local themeBtn=Instance.new("TextButton",header)
 themeBtn.Size=UDim2.new(0,math.floor(PW*0.22),0,math.floor(HH*0.55))
 themeBtn.Position=UDim2.new(1,-math.floor(PW*0.31),0.5,-math.floor(HH*0.275))
 themeBtn.BackgroundColor3=P.raised themeBtn.BorderSizePixel=0
 themeBtn.Font=Enum.Font.Gotham themeBtn.Text=P.name
-themeBtn.TextColor3=P.textDim themeBtn.TextScaled=true themeBtn.ZIndex=3
+themeBtn.TextColor3=P.textDim themeBtn.TextScaled=true themeBtn.ZIndex=4
 corner(themeBtn,4)
 
 local minBtn=Instance.new("TextButton",header)
@@ -128,14 +163,19 @@ minBtn.Size=UDim2.new(0,24,0,math.floor(HH*0.55))
 minBtn.Position=UDim2.new(1,-30,0.5,-math.floor(HH*0.275))
 minBtn.BackgroundColor3=P.raised minBtn.BorderSizePixel=0
 minBtn.Font=Enum.Font.GothamBold minBtn.Text="-"
-minBtn.TextColor3=P.textDim minBtn.TextScaled=true minBtn.ZIndex=3
+minBtn.TextColor3=P.textDim minBtn.TextScaled=true minBtn.ZIndex=4
 corner(minBtn,4)
 
+-- ── drag (moves both panelBg and panelBorder together) ────────────────────────
 local dragging,dStart,dOrigin=false,nil,nil
-local function syncShadow() shadow.Position=UDim2.new(0,panel.Position.X.Offset+4,0,panel.Position.Y.Offset+5) end
+local function movePanels(nx,ny)
+    local ux,uy=UDim2.new(0,nx,0,ny),UDim2.new(0,nx,0,ny)
+    panelBg.Position=ux panelBorder.Position=uy
+    shadow.Position=UDim2.new(0,nx+5,0,ny+6)
+end
 header.InputBegan:Connect(function(inp)
     if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
-        dragging=true dStart=inp.Position dOrigin=panel.Position
+        dragging=true dStart=inp.Position dOrigin=panelBg.Position
         inp.Changed:Connect(function() if inp.UserInputState==Enum.UserInputState.End then dragging=false end end)
     end
 end)
@@ -143,17 +183,21 @@ UIS.InputChanged:Connect(function(inp)
     if not dragging then return end
     if inp.UserInputType~=Enum.UserInputType.MouseMovement and inp.UserInputType~=Enum.UserInputType.Touch then return end
     local d=inp.Position-dStart local v=vp()
-    panel.Position=UDim2.new(0,math.clamp(dOrigin.X.Offset+d.X,0,v.X-PW),0,math.clamp(dOrigin.Y.Offset+d.Y,0,v.Y-PH))
-    syncShadow()
+    movePanels(math.clamp(dOrigin.X.Offset+d.X,0,v.X-PW),math.clamp(dOrigin.Y.Offset+d.Y,0,v.Y-PH))
 end)
 UIS.InputEnded:Connect(function(inp)
     if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then dragging=false end
 end)
 
+-- ── search ────────────────────────────────────────────────────────────────────
 local searchBg=Instance.new("Frame",panel)
 searchBg.Size=UDim2.new(1,-PAD*2,0,SH) searchBg.Position=UDim2.new(0,PAD,0,HH+PAD)
-searchBg.BackgroundColor3=P.bg searchBg.BorderSizePixel=0
-corner(searchBg,5) mkstroke(searchBg,P.border,1,0.5)
+searchBg.BackgroundColor3=P.bg searchBg.BorderSizePixel=0 corner(searchBg,5)
+-- inner border on search (not on the panel, so no bleed)
+local sBorder=Instance.new("Frame",searchBg)
+sBorder.Size=UDim2.new(1,0,1,0) sBorder.BackgroundTransparency=1 sBorder.BorderSizePixel=0 corner(sBorder,5)
+local sStroke=Instance.new("UIStroke",sBorder) sStroke.Color=P.border sStroke.Thickness=1 sStroke.Transparency=0.5
+sStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
 
 local searchBox=Instance.new("TextBox",searchBg)
 searchBox.Size=UDim2.new(1,-8,1,0) searchBox.Position=UDim2.new(0,4,0,0)
@@ -162,13 +206,18 @@ searchBox.PlaceholderText="Search..." searchBox.PlaceholderColor3=P.textDim
 searchBox.Text="" searchBox.TextColor3=P.text searchBox.TextScaled=true
 searchBox.ClearTextOnFocus=false searchBox.BorderSizePixel=0
 
+-- ── full set toggle ───────────────────────────────────────────────────────────
 local fullBtn=Instance.new("TextButton",panel)
 fullBtn.Size=UDim2.new(1,-PAD*2,0,TH) fullBtn.Position=UDim2.new(0,PAD,0,toggleY)
 fullBtn.BackgroundColor3=P.raised fullBtn.BorderSizePixel=0
 fullBtn.Font=Enum.Font.GothamBold fullBtn.Text="Full Set  OFF"
-fullBtn.TextColor3=P.textDim fullBtn.TextScaled=true
-corner(fullBtn,5) mkstroke(fullBtn,P.border,1,0.6)
+fullBtn.TextColor3=P.textDim fullBtn.TextScaled=true corner(fullBtn,5)
+local fBorder=Instance.new("Frame",fullBtn)
+fBorder.Size=UDim2.new(1,0,1,0) fBorder.BackgroundTransparency=1 fBorder.BorderSizePixel=0 corner(fBorder,5)
+local fStroke=Instance.new("UIStroke",fBorder) fStroke.Color=P.border fStroke.Thickness=1 fStroke.Transparency=0.6
+fStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
 
+-- ── list ─────────────────────────────────────────────────────────────────────
 local list=Instance.new("ScrollingFrame",panel)
 list.Size=UDim2.new(1,-PAD*2,0,listH) list.Position=UDim2.new(0,PAD,0,listY)
 list.BackgroundColor3=P.bg list.BorderSizePixel=0
@@ -177,6 +226,13 @@ list.ScrollBarImageTransparency=0.3 list.ScrollingDirection=Enum.ScrollingDirect
 list.CanvasSize=UDim2.new(0,0,0,0) list.ElasticBehavior=Enum.ElasticBehavior.WhenScrollable
 corner(list,5)
 
+-- bottom fill: covers the gap between list bottom and panel bottom edge
+-- prevents the bg color from showing through the corner radius gap
+local bottomFill=Instance.new("Frame",panel)
+bottomFill.Size=UDim2.new(1,0,0,PAD+R) bottomFill.Position=UDim2.new(0,0,1,-(PAD+R))
+bottomFill.BackgroundColor3=P.panel bottomFill.BorderSizePixel=0 bottomFill.ZIndex=2
+
+-- ── Furina icon ───────────────────────────────────────────────────────────────
 local iconSG=Instance.new("ScreenGui") iconSG.Name="_avIcon" iconSG.ResetOnSpawn=false iconSG.Parent=root
 local icon=Instance.new("ImageButton",iconSG)
 icon.Image="rbxassetid://129041843013567" icon.ScaleType=Enum.ScaleType.Crop
@@ -201,29 +257,32 @@ UIS.InputChanged:Connect(function(inp)
     end
 end)
 
+-- ── minimize / restore ────────────────────────────────────────────────────────
 local isMin=false
+local function setPanelVisible(v) panelBg.Visible=v panelBorder.Visible=v shadow.Visible=v end
 local function minimize()
     isMin=true
-    TS:Create(panel,TweenInfo.new(0.2),{Size=UDim2.new(0,PW,0,0),BackgroundTransparency=1}):Play()
-    TS:Create(shadow,TweenInfo.new(0.2),{BackgroundTransparency=1}):Play()
-    task.delay(0.22,function() panel.Visible=false shadow.Visible=false icon.Visible=true end)
+    TS:Create(panelBg,TweenInfo.new(0.18),{Size=UDim2.new(0,PW,0,0),BackgroundTransparency=1}):Play()
+    TS:Create(panelBorder,TweenInfo.new(0.18),{Size=UDim2.new(0,PW,0,0)}):Play()
+    TS:Create(shadow,TweenInfo.new(0.18),{BackgroundTransparency=1}):Play()
+    task.delay(0.2,function() setPanelVisible(false) icon.Visible=true end)
 end
 local function restore()
-    isMin=false icon.Visible=false panel.Visible=true shadow.Visible=true
-    panel.Size=UDim2.new(0,PW,0,0) panel.BackgroundTransparency=1
-    TS:Create(panel,TweenInfo.new(0.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,PW,0,PH),BackgroundTransparency=0}):Play()
-    TS:Create(shadow,TweenInfo.new(0.3),{BackgroundTransparency=0.65}):Play()
+    isMin=false icon.Visible=false setPanelVisible(true)
+    panelBg.Size=UDim2.new(0,PW,0,0) panelBorder.Size=UDim2.new(0,PW,0,0) panelBg.BackgroundTransparency=1
+    TS:Create(panelBg,TweenInfo.new(0.28,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,PW,0,PH),BackgroundTransparency=0}):Play()
+    TS:Create(panelBorder,TweenInfo.new(0.28,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,PW,0,PH)}):Play()
+    TS:Create(shadow,TweenInfo.new(0.28),{BackgroundTransparency=0.7}):Play()
 end
 minBtn.MouseButton1Click:Connect(minimize)
 
-local tapCount=0
-local tapThread=nil
+local tapCount,tapThread=0,nil
 icon.InputEnded:Connect(function(inp)
     if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
         if iDrag then iHold=false iDrag=false return end
         tapCount=tapCount+1
         if tapThread then task.cancel(tapThread) end
-        tapThread=task.delay(0.4,function()
+        tapThread=task.delay(0.38,function()
             if tapCount>=2 and isMin then restore() end
             tapCount=0
         end)
@@ -235,26 +294,25 @@ UIS.InputBegan:Connect(function(inp,gp)
     if inp.KeyCode==Enum.KeyCode.RightShift then if isMin then restore() else minimize() end end
 end)
 
+-- ── pool (forward ref) ────────────────────────────────────────────────────────
 local pool={}
 
+-- ── theme ─────────────────────────────────────────────────────────────────────
 local function applyTheme()
     P=THEMES[themeIdx]
-    panel.BackgroundColor3=P.panel
-    header.BackgroundColor3=P.panel
-    headerBg.BackgroundColor3=P.bg
-    headerTopCover.BackgroundColor3=P.panel
-    rule.BackgroundColor3=P.border
+    panelBg.BackgroundColor3=P.panel
+    panelStroke.Color=P.border
+    header.BackgroundColor3=P.panel hBg.BackgroundColor3=P.bg hCover.BackgroundColor3=P.panel
+    hRule.BackgroundColor3=P.border
     titleLbl.TextColor3=P.text
     themeBtn.BackgroundColor3=P.raised themeBtn.TextColor3=P.textDim themeBtn.Text=P.name
     minBtn.BackgroundColor3=P.raised minBtn.TextColor3=P.textDim
-    searchBg.BackgroundColor3=P.bg
-    local ss=searchBg:FindFirstChildOfClass("UIStroke") if ss then ss.Color=P.border end
+    searchBg.BackgroundColor3=P.bg sStroke.Color=P.border
     searchBox.TextColor3=P.text searchBox.PlaceholderColor3=P.textDim
-    fullBtn.BackgroundColor3=P.raised fullBtn.TextColor3=P.textDim
+    fullBtn.BackgroundColor3=P.raised fullBtn.TextColor3=P.textDim fStroke.Color=P.border
     list.BackgroundColor3=P.bg list.ScrollBarImageColor3=P.accent
+    bottomFill.BackgroundColor3=P.panel
     icon.BackgroundColor3=P.raised
-    local ps=panel:FindFirstChildOfClass("UIStroke")
-    if ps then ps.Color=P.border ps.ApplyStrokeMode=Enum.ApplyStrokeMode.Border end
     for _,r in ipairs(pool) do
         r.btn.BackgroundColor3=P.raised
         r.nl.TextColor3=P.textDim r.tl.TextColor3=P.textDim r.bar.BackgroundColor3=P.accent
@@ -264,6 +322,7 @@ themeBtn.MouseButton1Click:Connect(function()
     themeIdx=themeIdx%#THEMES+1 applyTheme()
 end)
 
+-- ── database ──────────────────────────────────────────────────────────────────
 local DB
 local function loadDB()
     if DB then return end
@@ -289,6 +348,7 @@ local function loadDB()
             ["Wicked Dancing"]={"92849173543269","132238900951109"},["Zombie"]={"616158929","616160636"},
             ["Glow Motion"]={"137764781910579","96439737641086"},["Adidas Aura"]={"110211186840347","110211186840347"},
             ["No Boundaries"]={"18747067405","18747063918"},["Unboxed By Amazon"]={"98281136301627","138183121662404"},
+            ["KATSEYE"]={"108187809145790","108187809145790"},
         },
         Walk={
             ["Rthro"]="10921269718",["Patrol"]="1151231493",["Adidas Community"]="122150855457006",
@@ -303,7 +363,7 @@ local function loadDB()
             ["Stylish"]="616146177",["Robot"]="616095330",["Sneaky"]="1132510133",
             ["Superhero"]="10921298616",["Udzal"]="3303162967",["Toy"]="782843345",
             ["Princess"]="941028902",["Cowboy"]="1014421541",["Glow Motion"]="85809016093530",
-            ["Adidas Aura"]="83842218823011",
+            ["Adidas Aura"]="83842218823011",["KATSEYE"]="99182913548783",
         },
         Run={
             ["Rthro"]="10921261968",["Robot"]="10921250460",["Patrol"]="1150967949",
@@ -317,7 +377,7 @@ local function loadDB()
             ["Stylish"]="10921276116",["NFL"]="117333533048078",["Levitation"]="616010382",
             ["OldSchool"]="10921240218",["Vampire"]="10921320299",["Bubbly"]="10921057244",
             ["Superhero"]="10921291831",["Toy"]="10921306285",["Princess"]="941015281",
-            ["Cowboy"]="1014401683",["Glow Motion"]="101925097435036",["Adidas Aura"]="118320322718866",
+            ["Cowboy"]="1014401683",["Glow Motion"]="101925097435036",["Adidas Aura"]="118320322718866",["KATSEYE"]="73117360545482",
         },
         Jump={
             ["Rthro"]="10921263860",["Robot"]="616090535",["Patrol"]="1148811837",
@@ -332,7 +392,7 @@ local function loadDB()
             ["NFL"]="119846112151352",["OldSchool"]="10921242013",["Stylish"]="616139451",
             ["Bubbly"]="910016857",["Vampire"]="1083455352",["Wicked (Popular)"]="104325245285198",
             ["Toy"]="10921308158",["Princess"]="941008832",["Glow Motion"]="74159004634379",
-            ["Adidas Aura"]="109996626521204",
+            ["Adidas Aura"]="109996626521204",["KATSEYE"]="103632305262747",
         },
         Fall={
             ["Rthro"]="10921262864",["Robot"]="616087089",["Patrol"]="1148863382",
@@ -346,7 +406,7 @@ local function loadDB()
             ["OldSchool"]="10921241244",["Sneaky"]="1132469004",["Elder"]="10921105765",
             ["Bubbly"]="910001910",["Stylish"]="616134815",["Vampire"]="1083443587",
             ["Superhero"]="10921293373",["Toy"]="782846423",["Princess"]="941000007",
-            ["Cowboy"]="1014384571",["Glow Motion"]="98070939608691",["Adidas Aura"]="95603166884636",
+            ["Cowboy"]="1014384571",["Glow Motion"]="98070939608691",["Adidas Aura"]="95603166884636",["KATSEYE"]="127802717128367",
         },
         SwimIdle={
             ["Rthro"]="10921265698",["Sneaky"]="1132506407",["Superhero"]="10921297391",
@@ -359,7 +419,7 @@ local function loadDB()
             ["Robot"]="10921253767",["Elder"]="10921110146",["Bubbly"]="910030921",
             ["Patrol"]="1151221899",["Vampire"]="10921325443",["Popstar"]="1212998578",
             ["Ninja"]="656118341",["Toy"]="10921310341",["Confident"]="1070012133",
-            ["Princess"]="941025398",["Stylish"]="10921281964",["Glow Motion"]="112946194103503",
+            ["Princess"]="941025398",["Stylish"]="10921281964",["Glow Motion"]="112946194103503",["KATSEYE"]="8619485942849",
         },
         Swim={
             ["Rthro"]="10921264784",["Sneaky"]="1132500520",["Patrol"]="1151204998",
@@ -372,7 +432,7 @@ local function loadDB()
             ["OldSchool"]="10921243048",["Wicked Dancing"]="110657013921774",["Elder"]="10921108971",
             ["Bubbly"]="910028158",["Robot"]="10921253142",["Vampire"]="10921324408",
             ["Stylish"]="10921281000",["Toy"]="10921309319",["Superhero"]="10921295495",
-            ["Princess"]="941018893",["Confident"]="1070009914",["Glow Motion"]="83003487432457",
+            ["Princess"]="941018893",["Confident"]="1070009914",["Glow Motion"]="83003487432457",["KATSEYE"]="134148268480210",
         },
         Climb={
             ["Rthro"]="10921257536",["Robot"]="616086039",["Patrol"]="1148811837",
@@ -386,7 +446,7 @@ local function loadDB()
             ["Elder"]="845392038",["Stylish"]="10921271391",["Superhero"]="10921286911",
             ["Werewolf"]="10921329322",["Vampire"]="1083439238",["Toy"]="10921300839",
             ["Wicked (Popular)"]="131326830509784",["Princess"]="940996062",
-            ["Glow Motion"]="108236155509584",["Adidas Aura"]="97824616490448",
+            ["Glow Motion"]="108236155509584",["Adidas Aura"]="97824616490448",["KATSEYE"]="106213237973858",
         }
     }
 end
@@ -451,7 +511,8 @@ if Players.LocalPlayer.Character then
     end)
 end
 
-local POOL=14
+-- ── virtual list ──────────────────────────────────────────────────────────────
+local POOL=18
 local RH=33
 local RS=RH+3
 local pConns={}
@@ -467,27 +528,20 @@ local function makeRow(i)
     btn.Position=UDim2.new(0,0,0,(i-1)*RS)
     btn.BackgroundColor3=P.raised btn.BorderSizePixel=0
     btn.Font=Enum.Font.Gotham btn.Text=""
-    btn.TextScaled=true
-    -- FIX: ClipsDescendants=true prevents NL/TL labels bleeding outside button
-    btn.ClipsDescendants=true
+    btn.TextScaled=true btn.ClipsDescendants=true  -- clips NL/TL inside button
     btn.Visible=false btn.ZIndex=3
     corner(btn,5)
 
-    -- NL: name, left side, stops before tag
+    -- name label: right boundary = button width minus tag area
     local nl=Instance.new("TextLabel",btn)
-    nl.Name="NL"
-    nl.Size=UDim2.new(1,-TAGW-4,1,0)
-    nl.Position=UDim2.new(0,8,0,0)
+    nl.Name="NL" nl.Size=UDim2.new(1,-TAGW-4,1,0) nl.Position=UDim2.new(0,8,0,0)
     nl.BackgroundTransparency=1 nl.Font=Enum.Font.Gotham nl.Text=""
     nl.TextColor3=P.textDim nl.TextScaled=true nl.TextXAlignment=Enum.TextXAlignment.Left
     nl.TextTruncate=Enum.TextTruncate.AtEnd nl.ZIndex=4
 
-    -- TL: type tag, right side, fully inside button
+    -- type tag: anchored from right, breathing room from edge
     local tl=Instance.new("TextLabel",btn)
-    tl.Name="TL"
-    -- position from right edge inward, with 4px breathing room from edge
-    tl.Size=UDim2.new(0,TAGW-8,1,0)
-    tl.Position=UDim2.new(1,-TAGW+4,0,0)
+    tl.Name="TL" tl.Size=UDim2.new(0,TAGW-6,1,0) tl.Position=UDim2.new(1,-TAGW+2,0,0)
     tl.BackgroundTransparency=1 tl.Font=Enum.Font.Gotham tl.Text=""
     tl.TextColor3=P.textDim tl.TextScaled=true tl.TextXAlignment=Enum.TextXAlignment.Right
     tl.ZIndex=4
@@ -500,6 +554,7 @@ local function makeRow(i)
     local ref={btn=btn,nl=nl,tl=tl,bar=bar,_key=nil}
     pool[i]=ref
 
+    -- hover: assigned once, never re-assigned (no lag from reconnections)
     if not isTouch then
         btn.MouseEnter:Connect(function()
             if activeKey~=ref._key then btn.BackgroundColor3=P.hover nl.TextColor3=P.text end
@@ -525,7 +580,6 @@ local function populateData()
             end
         end
     end
-
     local cnt,slots={},{}
     for _,t in ipairs(ORDER) do
         if DB[t] then for name,ids in pairs(DB[t]) do
@@ -566,11 +620,15 @@ local function rebuildFiltered()
     lastScrollRow=-1
 end
 
+-- renderRows: pure property sets, zero TweenService calls
 local function renderRows()
+    -- set canvas size first so scrollframe knows its full extent
+    list.CanvasSize=UDim2.new(0,0,0,#filtered*RS)
     local sy=list.CanvasPosition.Y
     local s1=math.floor(sy/RS)+1
     if s1==lastScrollRow and not filteredDirty then return end
     lastScrollRow=s1
+    filteredDirty=false
     local s2=math.min(s1+POOL-1,#filtered)
 
     for _,c in ipairs(pConns) do if c then c:Disconnect() end end
@@ -582,14 +640,12 @@ local function renderRows()
             local d=filtered[di]
             local act=activeKey==d.key
             ref._key=d.key
-
             ref.btn.Position=UDim2.new(0,0,0,(di-1)*RS)
             ref.btn.Visible=true
             ref.btn.BackgroundColor3=act and P.active or P.raised
             ref.nl.Text=d.name ref.nl.TextColor3=act and P.text or P.textDim
             ref.tl.Text=d.type ref.tl.TextColor3=act and P.accent or P.textDim
             ref.bar.Visible=act
-
             pConns[i]=ref.btn.MouseButton1Click:Connect(function()
                 pcall(function()
                     activeKey=d.key
@@ -604,11 +660,9 @@ local function renderRows()
                 end)
             end)
         else
-            ref.btn.Visible=false
-            ref._key=nil
+            ref.btn.Visible=false ref._key=nil
         end
     end
-    list.CanvasSize=UDim2.new(0,0,0,#filtered*RS)
 end
 
 local function updateList() rebuildFiltered() renderRows() end
@@ -630,12 +684,15 @@ fullBtn.MouseButton1Click:Connect(function()
     list.CanvasPosition=Vector2.new(0,0) updateList()
 end)
 
+-- ── boot ──────────────────────────────────────────────────────────────────────
 task.delay(0.3,function() loadDB() populateData() updateList() end)
 
-panel.Size=UDim2.new(0,PW,0,0) panel.BackgroundTransparency=1 shadow.BackgroundTransparency=1
+panelBg.Size=UDim2.new(0,PW,0,0) panelBorder.Size=UDim2.new(0,PW,0,0) panelBg.BackgroundTransparency=1
+shadow.BackgroundTransparency=1
 task.wait(0.1)
-TS:Create(panel,TweenInfo.new(0.38,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,PW,0,PH),BackgroundTransparency=0}):Play()
-TS:Create(shadow,TweenInfo.new(0.38),{BackgroundTransparency=0.65}):Play()
+TS:Create(panelBg,TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,PW,0,PH),BackgroundTransparency=0}):Play()
+TS:Create(panelBorder,TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,PW,0,PH)}):Play()
+TS:Create(shadow,TweenInfo.new(0.35),{BackgroundTransparency=0.7}):Play()
 
 Notify("Animations",string.format("loaded in %.2fs",os.clock()-st),2.5)
 
